@@ -133,7 +133,7 @@ type ServiceConfig struct {
 	VolumesFrom     []string                         `yaml:"volumes_from,omitempty" json:"volumes_from,omitempty"`
 	WorkingDir      string                           `yaml:"working_dir,omitempty" json:"working_dir,omitempty"`
 
-	Extensions Extensions `yaml:"#extensions,inline,omitempty" json:"-"`
+	Extensions Extensions `yaml:"#extensions,inline,omitempty" json:"#extensions,inline,omitempty"`
 }
 
 // MarshalYAML makes ServiceConfig implement yaml.Marshaller
