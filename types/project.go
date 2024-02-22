@@ -584,6 +584,24 @@ func (p *Project) MarshalYAML() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+func cleanExtensions(m map[string]interface{}) {
+	for key, value := range m {
+		if key == "#extensions" {
+			ext, ok := value.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			for e, v := range ext {
+				m[e] = v
+			}
+			delete(m, "#extensions")
+		}
+		if v, ok := value.(map[string]interface{}); ok {
+			cleanExtensions(v)
+		}
+	}
+}
+
 // MarshalJSON makes Config implement json.Marshaler
 func (p *Project) MarshalJSON() ([]byte, error) {
 	m := map[string]interface{}{
@@ -606,6 +624,9 @@ func (p *Project) MarshalJSON() ([]byte, error) {
 	for k, v := range p.Extensions {
 		m[k] = v
 	}
+	a, _ := json.Marshal(m)
+	json.Unmarshal(a, &m)
+	cleanExtensions(m)
 	return json.Marshal(m)
 }
 
