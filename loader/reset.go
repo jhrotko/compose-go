@@ -47,6 +47,7 @@ func (p *ResetProcessor) resolveReset(node *yaml.Node, path tree.Path) (*yaml.No
 	}
 	// If the node is an alias, We need to process the alias field in order to consider the !override and !reset tags
 	if node.Kind == yaml.AliasNode {
+		fmt.Printf("\nnode: %v\n", node.Value)
 		return p.resolveReset(node.Alias, path)
 	}
 

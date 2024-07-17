@@ -282,6 +282,8 @@ func parseYAML(decoder *yaml.Decoder) (map[string]interface{}, PostProcessor, er
 		return nil, nil, err
 	}
 	stringMap, ok := cfg.(map[string]interface{})
+	fmt.Printf("[parseYAML] stringMap %v\n\n", stringMap)
+
 	if ok {
 		converted, err := convertToStringKeysRecursive(stringMap, "")
 		if err != nil {
@@ -424,6 +426,7 @@ func loadYamlFile(ctx context.Context, file types.ConfigFile, opts *Options, wor
 
 	processRawYaml := func(raw interface{}, processors ...PostProcessor) error {
 		converted, err := convertToStringKeysRecursive(raw, "")
+		fmt.Printf("CONVERTED %v\n", converted)
 		if err != nil {
 			return err
 		}
@@ -442,6 +445,8 @@ func loadYamlFile(ctx context.Context, file types.ConfigFile, opts *Options, wor
 		}
 
 		for _, processor := range processors {
+			fmt.Printf("[Apply] processor:%v\n\n", processor)
+
 			if err := processor.Apply(dict); err != nil {
 				return err
 			}
@@ -454,7 +459,7 @@ func loadYamlFile(ctx context.Context, file types.ConfigFile, opts *Options, wor
 				return err
 			}
 		}
-
+		fmt.Printf("[loadYaml] merge\ndict:%v\ncfg:%v\n", dict, cfg)
 		dict, err = override.Merge(dict, cfg)
 		if err != nil {
 			return err
@@ -462,6 +467,7 @@ func loadYamlFile(ctx context.Context, file types.ConfigFile, opts *Options, wor
 
 		if !opts.SkipValidation {
 			if err := schema.Validate(dict); err != nil {
+				fmt.Printf("\nVALIDATION DICT: %v\n\n", dict)
 				return fmt.Errorf("validating %s: %w", file.Filename, err)
 			}
 			if _, ok := dict["version"]; ok {
@@ -479,7 +485,9 @@ func loadYamlFile(ctx context.Context, file types.ConfigFile, opts *Options, wor
 		for {
 			var raw interface{}
 			reset := &ResetProcessor{target: &raw}
-			err := decoder.Decode(reset)
+			sequence := &SequenceProcessor{target: &raw}
+			err := decoder.Decode(sequence)
+			fmt.Printf("\nRESET %v\n", raw)
 			if err != nil && errors.Is(err, io.EOF) {
 				break
 			}
@@ -487,7 +495,8 @@ func loadYamlFile(ctx context.Context, file types.ConfigFile, opts *Options, wor
 				return nil, nil, err
 			}
 			processor = reset
-			if err := processRawYaml(raw, processor); err != nil {
+
+			if err := processRawYaml(raw, processor, sequence); err != nil {
 				return nil, nil, err
 			}
 		}
@@ -763,6 +772,7 @@ func nameServices(from reflect.Value, to reflect.Value) (interface{}, error) {
 
 // keys need to be converted to strings for jsonschema
 func convertToStringKeysRecursive(value interface{}, keyPrefix string) (interface{}, error) {
+	// fmt.Printf("[convertToStringKeysRecursive] value %v\n\n", value)
 	if mapping, ok := value.(map[string]interface{}); ok {
 		for key, entry := range mapping {
 			var newKeyPrefix string

@@ -144,3 +144,103 @@ configs:
 		},
 	})
 }
+
+func TestParseYAMLFilesMergeOverrideArray(t *testing.T) {
+	model, err := loadYamlModel(context.TODO(), types.ConfigDetails{
+		ConfigFiles: []types.ConfigFile{
+			{Filename: "override.yaml",
+				Content: []byte(`
+x-app:
+  volumes: &app-volumes
+    - /data/app:/app/data
+services:
+  app:
+    image: myapp:latest
+    volumes:
+      - *app-volumes
+      - /logs/app:/app/logs
+`)},
+		}}, &Options{}, &cycleTracker{}, nil)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, model, map[string]interface{}{
+		"services": map[string]interface{}{
+			"app": map[string]interface{}{
+				"image": "myapp:latest",
+				"volumes": []interface{}{
+					map[string]interface{}{
+						"bind": map[string]interface{}{
+							"create_host_path": bool(true),
+						},
+						"source": string("/data/app"),
+						"target": string("/app/data"), // should merge /data/app:/app/data
+						"type":   string("bind"),
+					},
+					map[string]interface{}{
+						"bind": map[string]interface{}{
+							"create_host_path": bool(true),
+						},
+						"source": string("/logs/app"),
+						"target": string("/app/logs"),
+						"type":   string("bind"),
+					},
+				},
+			},
+		},
+		"x-app": map[string]interface{}{
+			"volumes": []interface{}{
+				string("/data/app:/app/data"),
+			},
+		},
+	})
+}
+
+func TestParseYAMLFilesMergeMapArray(t *testing.T) {
+	model, err := loadYamlModel(context.TODO(), types.ConfigDetails{
+		ConfigFiles: []types.ConfigFile{
+			{Filename: "override.yaml",
+				Content: []byte(`
+x-app: &app-volumes
+  image: alpine
+  volumes: 
+    - /data/app:/app/data
+services:
+  app:
+    image: python
+    <<: *app-volumes
+    volumes:
+      - /logs/app:/app/logs
+`)},
+		}}, &Options{}, &cycleTracker{}, nil)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, model, map[string]interface{}{
+		"services": map[string]interface{}{
+			"app": map[string]interface{}{
+				"image": "alpine", // should override
+				"volumes": []interface{}{
+					map[string]interface{}{
+						"bind": map[string]interface{}{
+							"create_host_path": bool(true),
+						},
+						"source": string("/logs/app"),
+						"target": string("/app/logs"),
+						"type":   string("bind"),
+					},
+					map[string]interface{}{
+						"bind": map[string]interface{}{
+							"create_host_path": bool(true),
+						},
+						"source": string("/data/app"),
+						"target": string("/app/data"), // should merge /data/app:/app/data
+						"type":   string("bind"),
+					},
+				},
+			},
+		},
+		"x-app": map[string]interface{}{
+			"image": "alpine",
+			"volumes": []interface{}{
+				string("/data/app:/app/data"),
+			},
+		},
+	})
+}
